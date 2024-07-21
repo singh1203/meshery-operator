@@ -19,9 +19,8 @@ package controllers
 import (
 	"context"
 
-	"github.com/go-logr/logr"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -31,6 +30,7 @@ import (
 	mesheryv1alpha1 "github.com/layer5io/meshery-operator/api/v1alpha1"
 	brokerpackage "github.com/layer5io/meshery-operator/pkg/broker"
 	"github.com/layer5io/meshery-operator/pkg/utils"
+	"github.com/layer5io/meshkit/logger"
 	kubeerror "k8s.io/apimachinery/pkg/api/errors"
 	types "k8s.io/apimachinery/pkg/types"
 )
@@ -40,7 +40,7 @@ type BrokerReconciler struct {
 	client.Client
 	KubeConfig *rest.Config
 	Clientset  *kubernetes.Clientset
-	Log        logr.Logger
+	Log        logger.Logger
 	Scheme     *runtime.Scheme
 }
 
@@ -48,7 +48,7 @@ type BrokerReconciler struct {
 // +kubebuilder:rbac:groups=meshery.layer5.io,resources=brokers/status,verbs=get;update;patch
 
 func (r *BrokerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log
+	log := r.Log.ControllerLogger()
 	log = log.WithValues("controller", "Broker")
 	log = log.WithValues("namespace", req.NamespacedName)
 	log.Info("Reconciling broker")
@@ -69,7 +69,7 @@ func (r *BrokerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err := r.reconcileBroker(ctx, true, baseResource, req)
 	if err != nil {
 		err = ErrReconcileBroker(err)
-		r.Log.Error(err, "broker reconcilation failed")
+		r.Log.Error(err)
 		return ctrl.Result{}, err
 	}
 
@@ -83,7 +83,7 @@ func (r *BrokerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	err = brokerpackage.GetEndpoint(ctx, baseResource, r.Clientset, r.KubeConfig.Host)
 	if err != nil {
 		err = ErrGetEndpoint(err)
-		r.Log.Error(err, "unable to get the broker endpoint")
+		r.Log.Error(err)
 		return ctrl.Result{}, err
 	}
 
@@ -91,14 +91,14 @@ func (r *BrokerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	patch, err := utils.Marshal(baseResource)
 	if err != nil {
 		err = ErrUpdateResource(err)
-		r.Log.Error(err, "unable to update broker resource")
+		r.Log.Error(err)
 		return ctrl.Result{}, err
 	}
 
 	err = r.Status().Patch(ctx, baseResource, client.RawPatch(types.MergePatchType, []byte(patch)))
 	if err != nil {
 		err = ErrUpdateResource(err)
-		r.Log.Error(err, "unable to update broker resource")
+		r.Log.Error(err)
 		return ctrl.Result{}, err
 	}
 
